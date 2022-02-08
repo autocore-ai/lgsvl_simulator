@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot name="vehicle" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find lgsvl_simulator)/urdf/sensors.xacro"/>
+
+  <xacro:property name="vehicle_info" value="${load_yaml('$(find lgsvl_simulator)/config/vehicle_info.yaml')}"/>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="${vehicle_info['wheel_base']/2.0} 0 0" rpy="${pi/2.0} 0 ${pi}"/>
+      <geometry>
+        <mesh filename="package://lexus_description/mesh/lexus.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+</robot>

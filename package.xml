@@ -1,0 +1,20 @@
+<?xml version="1.0" ?>
+<package format="2">
+  <name>lgsvl_simulator</name>
+  <version>0.1.0</version>
+  <description>The lgsvl_simulator package</description>
+  <maintainer email="luxiang.zhou@autocore.ai">Zhou Luxiang</maintainer>
+  <license>Apache 2</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>autoware_msgs</depend>
+  <depend>autoware_vehicle_msgs</depend>
+  <depend>geo_pos_conv</depend>
+  <depend>geometry_msgs</depend>
+  <depend>lexus_description</depend>
+  <depend>perception_launch</depend>
+  <depend>roscpp</depend>
+  <depend>sensing_launch</depend>
+  <depend>std_msgs</depend>
+  <depend>tf</depend>
+  <depend>vehicle_launch</depend>
+</package>

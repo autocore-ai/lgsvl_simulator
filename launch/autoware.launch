@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="map_path" default="$(env PWD)/install/lgsvl_simulator/share/lgsvl_simulator/data/map/autonomoustuff_parking_lot" doc="point cloud and lanelet2 map directory path"/>
+  <arg name="vehicle_model" default="lexus"/>
+  <arg name="sensor_model" default="aip_xx1"/>
+  <arg name="rviz" default="true" doc="launch rviz"/>
+  <arg name="lanelet2_map_path" default="$(arg map_path)/lanelet2_map.osm" />
+  <arg name="pointcloud_map_path" default="$(arg map_path)/pointcloud_map.pcd" />
+  <arg name="manager" default="lidar_nodelet_manager" />
+
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
+
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find lgsvl_simulator)/urdf/vehicle.xacro config_dir:=$(find lgsvl_simulator)/config"/>
+
+  <group ns="/vehicle_info">
+    <rosparam file="$(find lgsvl_simulator)/config/vehicle_info.yaml" command="load"/>
+    <node name="additional_vehicle_info_generator" pkg="additional_vehicle_info_generator" type="additional_vehicle_info_generator" output="screen"/>
+
+    <group ns="mirror">
+      <rosparam file="$(find lgsvl_simulator)/config/mirror.yaml" command="load"/>
+    </group>
+  </group>
+
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+
+  <node pkg="lgsvl_simulator" type="points_raw_proxy" name="points_raw_proxy" output="screen">
+    <remap from="input" to="/points_raw" />
+    <remap from="output" to="/points_raw_fixed" />
+  </node>
+
+  <node pkg="lgsvl_simulator" type="imu_raw_proxy" name="imu_raw_proxy" output="screen">
+    <remap from="input" to="/imu_raw" />
+    <remap from="output" to="/sensing/imu/imu_data" />
+  </node>
+
+  <node pkg="lgsvl_simulator" type="vehicle_cmd_proxy" name="vehicle_cmd_proxy" output="screen">
+    <remap from="input" to="/control/vehicle_cmd" />
+    <remap from="output" to="/vehicle_cmd" />
+  </node>
+
+  <!-- Map -->
+  <include file="$(find map_launch)/launch/map.launch">
+    <arg name="lanelet2_map_path" value="$(arg lanelet2_map_path)" />
+    <arg name="pointcloud_map_path" value="$(arg pointcloud_map_path)"/>
+  </include>
+
+  <!-- Sensing -->
+  <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" />
+  <node pkg="nodelet" type="nodelet" name="passthrough_filter" args="load pointcloud_preprocessor/passthrough_filter_nodelet $(arg manager)">
+    <remap from="~input" to="/points_raw_fixed" />
+    <remap from="~output" to="/sensing/lidar/concatenated/pointcloud" />
+    <param name="input_frame" value="velodyne" />
+    <param name="output_frame" value="base_link" />
+  </node>
+  <node pkg="nodelet" type="nodelet" name="$(arg manager)_crop_box_filter_self" args="load pointcloud_preprocessor/crop_box_filter_nodelet $(arg manager)">
+    <remap from="~input" to="/sensing/lidar/concatenated/pointcloud" />
+    <remap from="~output" to="/sensing/lidar/self_cropped/pointcloud" />
+    <remap from="~min_x" to="/vehicle_info/min_longitudinal_offset" />
+    <remap from="~max_x" to="/vehicle_info/max_longitudinal_offset" />
+    <remap from="~min_y" to="/vehicle_info/min_lateral_offset" />
+    <remap from="~max_y" to="/vehicle_info/max_lateral_offset" />
+    <remap from="~min_z" to="/vehicle_info/min_height_offset" />
+    <remap from="~max_z" to="/vehicle_info/max_height_offset" />
+    <param name="negative" value="True" />
+  </node>
+  <node pkg="nodelet" type="nodelet" name="crop_box_filter" args="load pointcloud_preprocessor/crop_box_filter_nodelet $(arg manager)">
+    <remap from="~input" to="/sensing/lidar/self_cropped/pointcloud" />
+    <remap from="~output" to="/sensing/lidar/mesurement_range_cropped/pointcloud" />
+    <param name="min_x" value="-50.0" />
+    <param name="max_x" value="100.0" />
+    <param name="min_y" value="-50.0" />
+    <param name="max_y" value="50.0" />
+    <remap from="~min_z" to="/vehicle_info/min_height_offset" />
+    <remap from="~max_z" to="/vehicle_info/max_height_offset" />
+    <param name="negative" value="False" />
+  </node>
+  <node pkg="nodelet" type="nodelet" name="ray_ground_filter" args="load pointcloud_preprocessor/ray_ground_filter_nodelet $(arg manager)">
+    <remap from="~input" to="/sensing/lidar/mesurement_range_cropped/pointcloud" />
+    <remap from="~output" to="/sensing/lidar/no_ground/pointcloud" />
+    <param name="general_max_slope" value="10.0" />
+    <param name="local_max_slope" value="10.0" />
+    <param name="min_height_threshold" value="0.2" />
+  </node>
+  <node pkg="topic_tools" type="relay" name="relay" args="/sensing/lidar/concatenated/pointcloud /sensing/lidar/pointcloud" />
+
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_imu" args="0 0 0 0 0 0 base_link imu 100"/>
+
+  <node pkg="lgsvl_simulator" type="odom_to_twist" name="odom_to_twist" output="screen">
+    <remap from="vehicle/twist" to="/vehicle/status/twist" />
+  </node>
+
+  <node pkg="lgsvl_simulator" type="nmea2tfpose" name="nmea2tfpose" output="screen">
+    <param name="offset_x" value="22438.6" />
+    <param name="offset_y" value="-36036.2" />
+    <param name="offset_z" value="-13.8" />
+    <param name="offset_roll" value="0" />
+    <param name="offset_pitch" value="0" />
+    <param name="offset_yaw" value="0" />
+  </node>
+  <node pkg="topic_tools" type="relay" name="relay_gnss_pose_cov" args="/gnss_pose_cov /sensing/gnss/pose_with_covariance" />
+
+  <!-- Localization -->
+  <include file="$(find localization_launch)/launch/localization.launch">
+    <arg name="pose_additional_delay" value="0.0"/>
+    <arg name="twist_additional_delay" value="0.0"/>
+  </include>
+
+  <!-- Perception -->
+  <node pkg="dummy_perception_publisher" type="empty_objects_publisher" name="empty_objects_publisher" output="screen">
+    <remap from="~output/objects" to="/perception/object_recognition/objects" />
+  </node>
+
+  <!-- Planning -->
+  <include file="$(find planning_launch)/launch/planning.launch" />
+
+  <!-- Control -->
+  <include file="$(find control_launch)/launch/control.launch">
+    <arg name="lateral_controller_mode" value="pure_pursuit" doc="options: mpc_follower, pure_pursuit"/>
+  </include>
+
+  <!-- Rviz -->
+  <node pkg="rviz" type="rviz" name="rviz" output="screen" args="-d $(find lgsvl_simulator)/rviz/autoware.rviz" if="$(arg rviz)" />
+
+  <node pkg="rostopic" type="rostopic" name="engage_pub" args="pub -r 1 /autoware/engage std_msgs/Bool 'data: true'" output="screen"/>
+</launch>
