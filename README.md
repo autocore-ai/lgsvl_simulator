@@ -20,7 +20,7 @@
     ```
 1. Build this package
     ```bash
-    AutowareArchitectureProposal.proj$ colcon build -DCMAKE_BUILD_TYPE=Release --catkin-skip-building-tests --packages-select autoware_msgs lgsvl_simulator
+    AutowareArchitectureProposal.proj$ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release --catkin-skip-building-tests --packages-select autoware_msgs lgsvl_simulator
     ```
 1. Launch LG SVL Simulator and config case with:
     * Map: AutonomouStuff
