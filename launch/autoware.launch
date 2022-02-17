@@ -100,10 +100,7 @@
   <node pkg="topic_tools" type="relay" name="relay_gnss_pose_cov" args="/gnss_pose_cov /sensing/gnss/pose_with_covariance" />
 
   <!-- Localization -->
-  <include file="$(find localization_launch)/launch/localization.launch">
-    <arg name="pose_additional_delay" value="0.0"/>
-    <arg name="twist_additional_delay" value="0.0"/>
-  </include>
+  <include file="$(find localization_launch)/launch/localization.launch" />
 
   <!-- Perception -->
   <node pkg="dummy_perception_publisher" type="empty_objects_publisher" name="empty_objects_publisher" output="screen">
